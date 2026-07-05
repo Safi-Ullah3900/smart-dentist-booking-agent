@@ -1,31 +1,26 @@
-{
-  "eval_cases": [
-    {
-      "eval_case_id": "greeting",
-      "prompt": {
-        "role": "user",
-        "parts": [{"text": "Hello, what can you help me with?"}]
+[
+  {
+    "name": "clinic_greeting",
+    "data": [
+      {
+        "query": "Hello, what services do you offer?"
       }
-    },
-    {
-      "eval_case_id": "weather_query",
-      "prompt": {
-        "role": "user",
-        "parts": [{"text": "What's the weather like in San Francisco?"}]
+    ]
+  },
+  {
+    "name": "booking_intent_check",
+    "data": [
+      {
+        "query": "I want to book an appointment for teeth cleaning this Thursday."
       }
-    },
-    {
-      "eval_case_id": "capital_lookup",
-      "prompt": {
-        "role": "user",
-        "parts": [{"text": "What is the capital of France?"}]
-      },
-      "reference": {
-        "response": {
-          "role": "model",
-          "parts": [{"text": "The capital of France is Paris."}]
-        }
+    ]
+  },
+  {
+    "name": "pricing_query",
+    "data": [
+      {
+        "query": "what are the prices for teeth cleaning?"
       }
-    }
-  ]
-}
+    ]
+  }
+]

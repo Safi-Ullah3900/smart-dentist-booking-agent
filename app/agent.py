@@ -40,6 +40,8 @@ Edge routing:
 import json
 import logging
 import re
+import sys
+from pathlib import Path
 from typing import Any
 
 from google.adk import Context
@@ -47,9 +49,15 @@ from google.adk.agents import LlmAgent
 from google.adk.apps import App
 from google.adk.events import RequestInput
 from google.adk.tools import AgentTool
+from google.adk.tools.mcp_tool.mcp_toolset import McpToolset, StdioConnectionParams
 from google.adk.workflow import Edge, START, Workflow, node
+from mcp import StdioServerParameters
 
 from .config import config
+
+# Path to mcp_server.py (same package directory as this file)
+_MCP_SERVER_PATH = str(Path(__file__).parent / "mcp_server.py")
+_PYTHON_EXE = sys.executable  # uses the active venv Python
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +143,38 @@ def knowledge_lookup(topic: str) -> str:
     }, indent=2)
 
 
+def request_booking_approval(
+    ctx: Context,
+    patient_name: str,
+    contact: str,
+    service: str,
+    date: str,
+    time_slot: str,
+    doctor_preference: str = "No preference",
+) -> str:
+    """Call this tool when you have collected all required information (patient name, contact, service, date, time slot) to submit the booking for approval.
+
+    Args:
+        patient_name: Full name of the patient.
+        contact: Patient's mobile number.
+        service: Service requested.
+        date: Appointment date.
+        time_slot: Appointment time slot.
+        doctor_preference: Preferred doctor.
+    """
+    ctx.state["booking_pending"] = True
+    ctx.state["booking_summary"] = (
+        f"**Patient**: {patient_name}\n"
+        f"**Contact**: {contact}\n"
+        f"**Service**: {service}\n"
+        f"**Date**: {date}\n"
+        f"**Time**: {time_slot}\n"
+        f"**Doctor**: {doctor_preference}"
+    )
+    return "Booking request submitted. Please wait for human approval."
+
+
+
 # ---------------------------------------------------------------------------
 # Sub-agents
 # ---------------------------------------------------------------------------
@@ -144,6 +184,8 @@ faq_agent = LlmAgent(
     model=config.model,
     instruction=f"""You are the FAQ specialist for {BUSINESS_KNOWLEDGE['business_name']}.
 Your role is to answer customer questions about services, prices, timings, location, payments, insurance, and general clinic information.
+
+Always call the `get_service_catalog` tool when the customer asks for services, prices, or list of treatments. Do not reply with generic answers if they ask about prices or catalog.
 
 BUSINESS DATA:
 {json.dumps(BUSINESS_KNOWLEDGE, indent=2)}
@@ -155,7 +197,20 @@ Guidelines:
 - Do NOT book appointments — only provide information.
 - Respond in the same language the customer used (English or Urdu).
 """,
-    tools=[knowledge_lookup],
+    tools=[
+        knowledge_lookup,
+        # MCP tools wired in: get_service_catalog, check_availability
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command=_PYTHON_EXE,
+                    args=[_MCP_SERVER_PATH],
+                ),
+                timeout=30,
+            ),
+            tool_filter=["get_service_catalog", "check_availability"],
+        ),
+    ],
     output_key="faq_response",
 )
 
@@ -165,33 +220,35 @@ booking_agent = LlmAgent(
     instruction=f"""You are the booking specialist for {BUSINESS_KNOWLEDGE['business_name']}.
 Your role is to collect all information needed to book an appointment.
 
-AVAILABLE SERVICES:
-{json.dumps({k: v['name'] + ' — ' + v['price'] for k, v in BUSINESS_KNOWLEDGE['services'].items()}, indent=2)}
-
 OPENING HOURS: {BUSINESS_KNOWLEDGE['timings']}
 
-You MUST collect ALL of these fields before confirming:
-1. Patient full name
-2. Contact number (Pakistani mobile format preferred: 03XX-XXXXXXX)
-3. Service requested (match to one of the services above)
-4. Preferred date (e.g., "2026-07-10" or "this Thursday")
-5. Preferred time slot (morning 9-12 / afternoon 12-4 / evening 4-7)
-6. Doctor preference (optional)
+You have access to tools — use them:
+- check_availability(date, service_id): Check free slots for a date
+- get_service_catalog(): Get all services with prices and IDs
+- request_booking_approval(patient_name, contact, service, date, time_slot, ...): Submit booking for approval.
 
-Output a JSON booking summary when all fields are collected, in this format:
-{{
-  "patient_name": "...",
-  "contact": "...",
-  "service": "...",
-  "price": "...",
-  "date": "...",
-  "time_slot": "...",
-  "doctor_preference": "...",
-  "booking_id": "BK-XXXX"
-}}
+Workflow:
+1. If the patient asks about services/prices, call get_service_catalog()
+2. Once you know their preferred date, call check_availability(date) to show free slots
+3. Collect: patient_name, contact, service (must be matched to one in the catalog), date, time_slot
+4. When you have all fields, call the request_booking_approval(...) tool to finalize. Do NOT confirm booking yourself without calling the tool.
 
-Be friendly and collect missing fields conversationally. Generate a booking ID like BK-{{}}.
+Be friendly and collect missing fields conversationally.
 """,
+    tools=[
+        request_booking_approval,
+        # MCP tools wired in: check_availability, get_booking_details, cancel_booking
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command=_PYTHON_EXE,
+                    args=[_MCP_SERVER_PATH],
+                ),
+                timeout=30,
+            ),
+            tool_filter=["check_availability", "get_booking_details", "cancel_booking"],
+        ),
+    ],
     output_key="booking_summary",
 )
 
@@ -302,7 +359,7 @@ def security_checkpoint(ctx: Context) -> dict:
                 ctx.state["audit_log"] = audit
                 logger.info("[AUDIT] %s", json.dumps(audit))
                 ctx.route = "ESCALATE"
-                return {"security_event": True, "audit": audit}
+                return user_message
 
     # --- Domain-specific rule: dental emergency fast-track ---
     emergency_keywords = ["toothache", "severe pain", "swollen", "bleeding", "emergency", "urgent", "درد", "ایمرجنسی"]
@@ -334,7 +391,8 @@ def security_checkpoint(ctx: Context) -> dict:
     logger.info("[AUDIT] %s", json.dumps(audit))
 
     ctx.route = intent
-    return {"intent": intent, "audit": audit}
+    return user_message
+
 
 
 @node
@@ -412,6 +470,21 @@ def final_output(ctx: Context) -> str:
     return response
 
 
+@node(rerun_on_resume=True)
+async def booking_flow(ctx: Context, node_input: Any) -> str:
+    """Execute the booking agent and conditionally route to human approval."""
+    # Run the booking agent
+    response = await ctx.run_node(booking_agent, node_input=node_input)
+
+    # Check if the booking agent triggered the request_booking_approval tool
+    if ctx.state.get("booking_pending") and not ctx.state.get("booking_confirmed"):
+        ctx.route = "APPROVAL"
+    else:
+        ctx.route = "CONTINUE"
+
+    return str(response)
+
+
 # ---------------------------------------------------------------------------
 # Build the Workflow graph
 # ---------------------------------------------------------------------------
@@ -421,7 +494,6 @@ def final_output(ctx: Context) -> str:
 # security_checkpoint and the intent stored in ctx.state.
 
 faq_node   = node(faq_agent,        name="faq_node")
-book_node  = node(booking_agent,    name="booking_node")
 esc_node   = node(escalation_agent, name="escalation_node")
 
 booking_workflow = Workflow(
@@ -432,21 +504,27 @@ booking_workflow = Workflow(
         # input classifier → security checkpoint
         Edge(from_node=input_classifier, to_node=security_checkpoint),
         # security checkpoint routes by ctx.route
-        Edge(from_node=security_checkpoint, to_node=faq_node,   route="FAQ"),
-        Edge(from_node=security_checkpoint, to_node=book_node,  route="BOOKING"),
-        Edge(from_node=security_checkpoint, to_node=esc_node,   route="ESCALATE"),
+        Edge(from_node=security_checkpoint, to_node=faq_node,      route="FAQ"),
+        Edge(from_node=security_checkpoint, to_node=booking_flow,  route="BOOKING"),
+        Edge(from_node=security_checkpoint, to_node=esc_node,      route="ESCALATE"),
         # FAQ → single unconditional edge to final_output
         Edge(from_node=faq_node,  to_node=final_output),
-        # Booking → HITL approval → final_output
-        Edge(from_node=book_node,   to_node=human_approval),
+        # Booking flow routes conditionally
+        Edge(from_node=booking_flow, to_node=human_approval, route="APPROVAL"),
+        Edge(from_node=booking_flow, to_node=final_output,   route="CONTINUE"),
+        # HITL approval → final_output
         Edge(from_node=human_approval, to_node=final_output),
         # Escalation → single unconditional edge to final_output
         Edge(from_node=esc_node, to_node=final_output),
     ],
 )
 
+
 # ADK App exposes the workflow as the root agent
 app = App(
     root_agent=booking_workflow,
     name="app",
 )
+
+# Alias expected by fast_api_app.py and external importers
+root_agent = booking_workflow
