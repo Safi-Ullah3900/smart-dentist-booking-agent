@@ -14,4 +14,9 @@ class AgentConfig:
     pii_redaction_enabled: bool = True
     injection_detection_enabled: bool = True
 
+    # WhatsApp Webhook Integration config
+    whatsapp_verify_token: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "default_verify_token_123")
+    whatsapp_api_token: str = os.getenv("WHATSAPP_API_TOKEN", "")
+    whatsapp_phone_number_id: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+
 config = AgentConfig()

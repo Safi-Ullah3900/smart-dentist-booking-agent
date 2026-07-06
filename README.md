@@ -92,3 +92,77 @@ Built-in telemetry exports to Cloud Trace, BigQuery, and Cloud Logging.
 
 This agent supports the [A2A Protocol](https://a2a-protocol.org/). Use the [A2A Inspector](https://github.com/a2aproject/a2a-inspector) to test interoperability.
 See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for details.
+
+## 📱 WhatsApp Webhook Integration
+
+This agent features a built-in Meta WhatsApp Cloud API Webhook to automate clinical bookings directly via WhatsApp chats.
+
+### Webhook Configuration Properties
+
+Set the following variables in your local `.env` file:
+```env
+# Verification handshake secret (arbitrary string matching Meta configuration)
+WHATSAPP_VERIFY_TOKEN=your_secure_verify_token_123
+
+# Meta Graph API configuration (for outbound message replies)
+WHATSAPP_API_TOKEN=your_meta_graph_api_access_token
+WHATSAPP_PHONE_NUMBER_ID=your_sender_phone_number_id
+```
+
+### Local Webhook Verification & Testing
+
+#### 1. Handshake Verification (GET /webhook)
+Simulate Meta's verification webhook handshake:
+```bash
+curl "http://localhost:8000/webhook?hub.mode=subscribe&hub.verify_token=your_secure_verify_token_123&hub.challenge=987654321"
+```
+*Expected Output:* `987654321` (plain text challenge value).
+
+#### 2. Send Mock WhatsApp Chat Notification (POST /webhook)
+Simulate an incoming text message from a customer:
+```bash
+curl -X POST "http://localhost:8000/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "12345",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "messages": [
+                {
+                  "from": "923001234567",
+                  "id": "wamid.abc123xyz",
+                  "timestamp": "1665096238",
+                  "text": {
+                    "body": "I want to book an appointment for teeth cleaning next Monday"
+                  },
+                  "type": "text"
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  }'
+```
+*Expected Output:*
+- Backend logs show session creation mapping to the phone number `wa-923001234567`.
+- The booking agent processes the request, routing it correctly.
+- If Graph credentials are set, it automatically replies back to the sender's phone.
+
+---
+
+## 🖼️ Assets
+
+### Cover Banner
+![SmartDentist Cover Banner](assets/cover_page_banner.png)
+
+### Agent Workflow Architecture Diagram
+![SmartDentist Architecture Diagram](assets/architecture_diagram.png)
+
