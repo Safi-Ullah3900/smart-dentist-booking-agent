@@ -187,3 +187,16 @@ curl -X POST "http://localhost:8000/webhook" \
 ## Demo Script
 
 See [DEMO_SCRIPT.txt](DEMO_SCRIPT.txt) for the full spoken narration script for your video recording.
+
+## 🎙️ Advanced Feature Upgrades (New!)
+
+### 1. Multimodal Voice Messaging (Audio-to-Text)
+The agent now features a dedicated endpoint `/webhook/whatsapp/audio` to accept incoming voice notes and audio files. Leveraging Google Gemini's native multimodal processing capabilities, it directly ingests the raw audio bytes, transcribes the patient's query, and generates an instant, context-aware text response without requiring external speech-to-text libraries.
+
+### 2. Trilingual Dynamic Localization Engine
+To optimize customer convenience across different regions, a strict localization layer has been injected into the core system instructions. The agent automatically detects the language and dialect of the incoming message—supporting:
+* 🇬🇧 **English** (Formal & Informal)
+* 🇵🇰 **Urdu** (Urdu Script & Roman Urdu)
+* 🇦🇫/🇵🇰 **Pashto** (Regional Dialects)
+
+The AI dynamically adjusts its persona to converse flawlessly in the user's exact matching language.

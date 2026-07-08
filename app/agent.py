@@ -195,7 +195,7 @@ Guidelines:
 - Always quote exact prices and timings from the data above.
 - If you cannot find the answer, say so and suggest calling {BUSINESS_KNOWLEDGE['contact']}.
 - Do NOT book appointments — only provide information.
-- Respond in the same language the customer used (English or Urdu).
+- STRICT RULE: Automatically detect if the incoming user message (written text or audio transcription) is in English, Urdu, Roman Urdu, or Pashto. You must respond dynamically in that exact same language and local dialect to maximize customer ease.
 """,
     tools=[
         knowledge_lookup,

@@ -27,7 +27,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
 import json
 import urllib.request
-from fastapi import FastAPI, Request, Response, Query, HTTPException
+from fastapi import FastAPI, Request, Response, Query, HTTPException, File, UploadFile
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
 from app.config import config
@@ -249,6 +249,33 @@ async def whatsapp_webhook_handler(request: Request):
         )
         
     return {"status": "success", "response": agent_response}
+
+
+@app.post("/webhook/whatsapp/audio")
+async def handle_whatsapp_voice(file: UploadFile = File(...)):
+    """Trial Endpoint to stream local voice messages directly into Gemini Multimodal Engine."""
+    try:
+        from google.genai import Client
+        from google.genai import types as genai_types
+        
+        # Initializes natively via your env token
+        client = Client()
+        audio_bytes = await file.read()
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                genai_types.Part.from_bytes(
+                    data=audio_bytes,
+                    mime_type=file.content_type,
+                ),
+                "Listen carefully to this patient query. Transcribe and respond to it efficiently."
+            ]
+        )
+        return {"status": "success", "reply": response.text}
+    except Exception as e:
+        logger.error("Voice processing failed: %s", e)
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/feedback")
