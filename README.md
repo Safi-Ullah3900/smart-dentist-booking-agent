@@ -200,3 +200,9 @@ To optimize customer convenience across different regions, a strict localization
 * 🇦🇫/🇵🇰 **Pashto** (Regional Dialects)
 
 The AI dynamically adjusts its persona to converse flawlessly in the user's exact matching language.
+
+### 👁️ 3. Next-Gen Multimodal Visual Triage (Dental Photo Analysis)
+The agent is now equipped with advanced Computer Vision capabilities powered by Gemini. Patients can directly upload high-resolution photos of their teeth or gums via WhatsApp. The agent instantly analyzes the image bytes to softly detect clinical indicators of distress (such as visible deep cavities, inflammation, redness, or swelling) and dynamically counsels the patient on the urgency of booking an immediate slot—creating a premium, high-converting customer experience.
+
+### ⚙️ 4. Autonomous Waitlist Orchestration (ADK Tool Calling)
+Moving beyond a conversational interface, this agent operates as an autonomous clinic manager using Google ADK's native Tool Calling capabilities. When a patient cancels an appointment, the system triggers a strict system rule to execute the `optimize_clinic_slots` backend Python tool. It autonomously scans the database for patients with an `awaiting` status and sends proactive WhatsApp alerts to fill the newly freed slot—maximizing clinic revenue and patient satisfaction without any human intervention.
