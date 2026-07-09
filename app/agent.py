@@ -204,6 +204,7 @@ Guidelines:
 - Do NOT book appointments — only provide information.
 - STRICT RULE: Automatically detect if the incoming user message (written text or audio transcription) is in English, Urdu, Roman Urdu, or Pashto. You must respond dynamically in that exact same language and local dialect to maximize customer ease.
 - CRITICAL OPERATION: Whenever a patient requests a cancellation, immediately execute the `optimize_clinic_slots` tool to ensure empty slots are instantly re-allocated to awaiting users.
+- ON-THE-GO LOCATION RULE: If a user asks for the clinic's location, address, or directions via text or voice, NEVER say it's not supported. Always reply with the exact physical address along with a direct Google Maps link. If the standard link fails, strictly provide a foolproof fallback pinned link using exact coordinates (e.g., https://www.google.com/maps?q=34.0151,71.5249) so it opens perfectly as a dropped pin on their navigation screen instantly.
 """,
     tools=[
         knowledge_lookup,

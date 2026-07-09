@@ -206,3 +206,6 @@ The agent is now equipped with advanced Computer Vision capabilities powered by 
 
 ### ⚙️ 4. Autonomous Waitlist Orchestration (ADK Tool Calling)
 Moving beyond a conversational interface, this agent operates as an autonomous clinic manager using Google ADK's native Tool Calling capabilities. When a patient cancels an appointment, the system triggers a strict system rule to execute the `optimize_clinic_slots` backend Python tool. It autonomously scans the database for patients with an `awaiting` status and sends proactive WhatsApp alerts to fill the newly freed slot—maximizing clinic revenue and patient satisfaction without any human intervention.
+
+### 🗺️ 5. On-The-Go Location & GPS Coordinates Fallback
+To ensure zero friction for users traveling or driving, the agent features a foolproof navigation delivery helper. When a user requests the clinic's address or location via text or voice note, the agent automatically provides the exact physical address paired with a direct Google Maps hyperlink. In case of standard map link rendering failures, it strictly deploys a universal fallback URL mapped to exact GPS coordinates, forcing a precise navigation pin-drop directly on the user's native mobile screen instantly.
